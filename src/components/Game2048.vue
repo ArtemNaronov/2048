@@ -103,7 +103,7 @@ const tileStyles = computed<Record<number, Record<number, { transform: string }>
   board.value.reduce((acc, tile) => {
     acc[tile.x] = acc[tile.x] || {};
     acc[tile.x][tile.y] = {
-      transform: `translate(${tile.x * 110}px, ${tile.y * 110}px)`
+      transform: `translate(${tile.x * 90}px, ${tile.y * 90}px)`
     };
     return acc;
   }, {} as Record<number, Record<number, { transform: string }>>)
@@ -144,8 +144,8 @@ onBeforeUnmount(() => {
 
 .board {
   position: relative;
-  width: 470px;
-  height: 470px;
+  width: 390px;
+  height: 390px;
   background: #bbada0;
   border-radius: 10px;
   margin-bottom: 20px;
@@ -158,8 +158,8 @@ h1 {
 
 .tile {
   position: absolute;
-  width: 100px;
-  height: 100px;
+  width: 80px;
+  height: 80px;
   display: flex;
   justify-content: center;
   align-items: center;
