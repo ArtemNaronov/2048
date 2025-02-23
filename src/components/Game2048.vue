@@ -121,6 +121,7 @@ onBeforeUnmount(() => {
   width: 100vw;
   background: #faf8ef;
   padding-top: 20px;
+  justify-content: center;
 }
 
 .score-board {
