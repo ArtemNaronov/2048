@@ -1,10 +1,10 @@
 <template>
-  <div class="game-container">
+  <div class="game-container" @mousedown="handleMouseDown" @mouseup="handleMouseUp">
     <h1>2048</h1>
     <div class="score-board">
       <p>Счёт: {{ score }}</p>
     </div>
-    <div class="board">
+    <div class="board" ref="boardRef">
       <div
         v-for="tile in board"
         :key="`${tile.x}-${tile.y}`"
@@ -20,32 +20,73 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onBeforeUnmount, computed, watchEffect } from "vue";
+import { ref, onMounted, onBeforeUnmount, computed } from "vue";
 import {
   initBoard,
   moveTiles,
-  handleTouchStart,
-  handleTouchMove,
 } from "../utils/game.js";
 
 const board = ref([]);
 const score = ref(0);
+const boardRef = ref(null);
+let touchStartX = 0, touchStartY = 0;
+let mouseStartX = 0, mouseStartY = 0;
 
 const startGame = () => {
   board.value = initBoard();
   score.value = 0;
 };
 
-const handleMove = (event) => {
-  const validKeys = ["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"];
-  if (!validKeys.includes(event.key)) return;
-
-  const { board: newBoard, score: newScore } = moveTiles(board.value, event.key);
+const handleMove = (direction) => {
+  const { board: newBoard, score: newScore } = moveTiles(board.value, direction);
   board.value = newBoard;
   score.value += newScore;
 };
 
-// Используем `computed` для создания стилей плиток
+// Обработчики для клавиатуры
+const handleKeyDown = (event) => {
+  const validKeys = ["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"];
+  if (validKeys.includes(event.key)) {
+    handleMove(event.key);
+  }
+};
+
+// Обработчики для мобильных свайпов
+const handleTouchStart = (event) => {
+  touchStartX = event.touches[0].clientX;
+  touchStartY = event.touches[0].clientY;
+};
+
+const handleTouchEnd = (event) => {
+  const touchEndX = event.changedTouches[0].clientX;
+  const touchEndY = event.changedTouches[0].clientY;
+  detectSwipe(touchStartX, touchStartY, touchEndX, touchEndY);
+};
+
+// Обработчики для мыши
+const handleMouseDown = (event) => {
+  mouseStartX = event.clientX;
+  mouseStartY = event.clientY;
+};
+
+const handleMouseUp = (event) => {
+  const mouseEndX = event.clientX;
+  const mouseEndY = event.clientY;
+  detectSwipe(mouseStartX, mouseStartY, mouseEndX, mouseEndY);
+};
+
+// Определение направления свайпа
+const detectSwipe = (startX, startY, endX, endY) => {
+  const diffX = startX - endX;
+  const diffY = startY - endY;
+  if (Math.abs(diffX) > Math.abs(diffY)) {
+    handleMove(diffX > 0 ? "ArrowLeft" : "ArrowRight");
+  } else {
+    handleMove(diffY > 0 ? "ArrowUp" : "ArrowDown");
+  }
+};
+
+// Вычисляем стили для плиток
 const tileStyles = computed(() =>
   board.value.reduce((acc, tile) => {
     acc[tile.x] = acc[tile.x] || [];
@@ -57,22 +98,17 @@ const tileStyles = computed(() =>
   }, [])
 );
 
-// Используем `watchEffect` для слежения за изменениями доски
-watchEffect(() => {
-  console.log("Обновление доски", board.value);
-});
-
 onMounted(() => {
   startGame();
-  window.addEventListener("keydown", handleMove);
+  window.addEventListener("keydown", handleKeyDown);
   document.addEventListener("touchstart", handleTouchStart, false);
-  document.addEventListener("touchmove", handleTouchMove, false);
+  document.addEventListener("touchend", handleTouchEnd, false);
 });
 
 onBeforeUnmount(() => {
-  window.removeEventListener("keydown", handleMove);
+  window.removeEventListener("keydown", handleKeyDown);
   document.removeEventListener("touchstart", handleTouchStart);
-  document.removeEventListener("touchmove", handleTouchMove);
+  document.removeEventListener("touchend", handleTouchEnd);
 });
 </script>
 
