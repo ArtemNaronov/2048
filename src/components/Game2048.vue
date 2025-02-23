@@ -10,7 +10,7 @@
         :key="`${tile.x}-${tile.y}`"
         class="tile"
         :class="'tile-' + tile.value"
-        :style="tileStyles[tile.x][tile.y]"
+        :style="tileStyles[tile.x]?.[tile.y]"
       >
         {{ tile.value !== 0 ? tile.value : "" }}
       </div>
@@ -19,64 +19,76 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, onMounted, onBeforeUnmount, computed } from "vue";
-import {
-  initBoard,
-  moveTiles,
-} from "../utils/game.js";
+import { initBoard, moveTiles } from "../utils/game";
 
-const board = ref([]);
-const score = ref(0);
-const boardRef = ref(null);
+// Определение интерфейса плитки
+interface Tile {
+  value: number;
+  x: number;
+  y: number;
+}
+
+// Определение типа доски
+type Board = Tile[];
+
+const board = ref<Board>([]);
+const score = ref<number>(0);
+const boardRef = ref<HTMLDivElement | null>(null);
+
 let touchStartX = 0, touchStartY = 0;
 let mouseStartX = 0, mouseStartY = 0;
 
-const startGame = () => {
+// Запуск новой игры
+const startGame = (): void => {
   board.value = initBoard();
   score.value = 0;
 };
 
-const handleMove = (direction) => {
+// Обработка движения плиток
+const handleMove = (direction: "ArrowLeft" | "ArrowRight" | "ArrowUp" | "ArrowDown"): void => {
   const { board: newBoard, score: newScore } = moveTiles(board.value, direction);
   board.value = newBoard;
   score.value += newScore;
 };
 
-// Обработчики для клавиатуры
-const handleKeyDown = (event) => {
-  const validKeys = ["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"];
-  if (validKeys.includes(event.key)) {
-    handleMove(event.key);
+// Обработчик событий клавиатуры
+const handleKeyDown = (event: KeyboardEvent): void => {
+  const validKeys = ["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"] as const;
+  if (validKeys.includes(event.key as any)) {
+    handleMove(event.key as "ArrowLeft" | "ArrowRight" | "ArrowUp" | "ArrowDown");
   }
 };
 
-// Обработчики для мобильных свайпов
-const handleTouchStart = (event) => {
+// Обработчик начала касания (мобильные устройства)
+const handleTouchStart = (event: TouchEvent): void => {
   touchStartX = event.touches[0].clientX;
   touchStartY = event.touches[0].clientY;
 };
 
-const handleTouchEnd = (event) => {
+// Обработчик окончания касания
+const handleTouchEnd = (event: TouchEvent): void => {
   const touchEndX = event.changedTouches[0].clientX;
   const touchEndY = event.changedTouches[0].clientY;
   detectSwipe(touchStartX, touchStartY, touchEndX, touchEndY);
 };
 
-// Обработчики для мыши
-const handleMouseDown = (event) => {
+// Обработчик начала нажатия мыши
+const handleMouseDown = (event: MouseEvent): void => {
   mouseStartX = event.clientX;
   mouseStartY = event.clientY;
 };
 
-const handleMouseUp = (event) => {
+// Обработчик окончания нажатия мыши
+const handleMouseUp = (event: MouseEvent): void => {
   const mouseEndX = event.clientX;
   const mouseEndY = event.clientY;
   detectSwipe(mouseStartX, mouseStartY, mouseEndX, mouseEndY);
 };
 
 // Определение направления свайпа
-const detectSwipe = (startX, startY, endX, endY) => {
+const detectSwipe = (startX: number, startY: number, endX: number, endY: number): void => {
   const diffX = startX - endX;
   const diffY = startY - endY;
   if (Math.abs(diffX) > Math.abs(diffY)) {
@@ -87,15 +99,14 @@ const detectSwipe = (startX, startY, endX, endY) => {
 };
 
 // Вычисляем стили для плиток
-const tileStyles = computed(() =>
+const tileStyles = computed<Record<number, Record<number, { transform: string }>>>(() =>
   board.value.reduce((acc, tile) => {
-    acc[tile.x] = acc[tile.x] || [];
+    acc[tile.x] = acc[tile.x] || {};
     acc[tile.x][tile.y] = {
-      transform: `translate(${tile.x * 110}px, ${tile.y * 110}px)`,
-      transition: "transform 0.2s ease-in-out",
+      transform: `translate(${tile.x * 110}px, ${tile.y * 110}px)`
     };
     return acc;
-  }, [])
+  }, {} as Record<number, Record<number, { transform: string }>>)
 );
 
 onMounted(() => {
