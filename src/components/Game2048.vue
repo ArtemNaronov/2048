@@ -157,6 +157,7 @@ h1 {
   background: #cdc1b4;
   border-radius: 5px;
   transition: transform 0.2s ease-in-out;
+  user-select: none;
 }
 
 .tile-2 {
