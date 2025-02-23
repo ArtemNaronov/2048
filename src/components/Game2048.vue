@@ -10,7 +10,7 @@
         :key="`${tile.x}-${tile.y}`"
         class="tile"
         :class="'tile-' + tile.value"
-        :style="getTileStyle(tile)"
+        :style="tileStyles[tile.x][tile.y]"
       >
         {{ tile.value !== 0 ? tile.value : "" }}
       </div>
@@ -20,7 +20,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from "vue";
+import { ref, onMounted, onBeforeUnmount, computed, watchEffect } from "vue";
 import {
   initBoard,
   moveTiles,
@@ -40,14 +40,26 @@ const handleMove = (event) => {
   const validKeys = ["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"];
   if (!validKeys.includes(event.key)) return;
 
-  let { board: newBoard, score: newScore } = moveTiles(board.value, event.key);
+  const { board: newBoard, score: newScore } = moveTiles(board.value, event.key);
   board.value = newBoard;
   score.value += newScore;
 };
 
-const getTileStyle = (tile) => ({
-  transform: `translate(${tile.x * 110}px, ${tile.y * 110}px)`,
-  transition: "transform 0.2s ease-in-out",
+// Используем `computed` для создания стилей плиток
+const tileStyles = computed(() =>
+  board.value.reduce((acc, tile) => {
+    acc[tile.x] = acc[tile.x] || [];
+    acc[tile.x][tile.y] = {
+      transform: `translate(${tile.x * 110}px, ${tile.y * 110}px)`,
+      transition: "transform 0.2s ease-in-out",
+    };
+    return acc;
+  }, [])
+);
+
+// Используем `watchEffect` для слежения за изменениями доски
+watchEffect(() => {
+  console.log("Обновление доски", board.value);
 });
 
 onMounted(() => {
@@ -55,6 +67,12 @@ onMounted(() => {
   window.addEventListener("keydown", handleMove);
   document.addEventListener("touchstart", handleTouchStart, false);
   document.addEventListener("touchmove", handleTouchMove, false);
+});
+
+onBeforeUnmount(() => {
+  window.removeEventListener("keydown", handleMove);
+  document.removeEventListener("touchstart", handleTouchStart);
+  document.removeEventListener("touchmove", handleTouchMove);
 });
 </script>
 
@@ -102,6 +120,7 @@ h1 {
   color: #776e65;
   background: #cdc1b4;
   border-radius: 5px;
+  transition: transform 0.2s ease-in-out;
 }
 
 .tile-2 {
