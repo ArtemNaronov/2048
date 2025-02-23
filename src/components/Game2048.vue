@@ -63,8 +63,8 @@ onMounted(() => {
   display: flex;
   flex-direction: column;
   align-items: center;
-  height: 100svh;
-  width: 100svw;
+  height: 100vh;
+  width: 100vw;
   background: #faf8ef;
   padding-top: 20px;
 }
@@ -78,8 +78,8 @@ onMounted(() => {
 
 .board {
   position: relative;
-  width: 430px;
-  height: 430px;
+  width: 470px;
+  height: 470px;
   background: #bbada0;
   border-radius: 10px;
   margin-bottom: 20px;
