@@ -125,12 +125,14 @@ const tileStyles = computed<Record<number, Record<number, { transform: string }>
 
 onMounted(() => {
   startGame();
+  window.addEventListener("keydown", handleKeyDown);
   document.addEventListener("touchstart", handleTouchStart, { passive: false });
   document.addEventListener("touchmove", handleTouchMove, { passive: false });
   document.addEventListener("touchend", handleTouchEnd, { passive: false });
 });
 
 onBeforeUnmount(() => {
+  window.removeEventListener("keydown", handleKeyDown);
   document.removeEventListener("touchstart", handleTouchStart);
   document.removeEventListener("touchmove", handleTouchMove);
   document.removeEventListener("touchend", handleTouchEnd);
