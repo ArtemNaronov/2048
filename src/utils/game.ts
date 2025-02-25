@@ -43,7 +43,10 @@ const hasMoveLeft = (board: Board): boolean => {
   return false;
 };
 
-export const moveTiles = (board: Board, direction: string): { board: Board; score: number } => {
+export const moveTiles = (board: Board, direction: string, currentScore: number): { board: Board; score: number } => {
+  previousBoard = board.map(tile => ({ ...tile })); // Копируем предыдущее состояние
+  previousScore = currentScore;
+  
   let newBoard: Board = board.map((tile, index) => ({
     ...tile,
     x: index % 4,
@@ -123,4 +126,14 @@ export const moveTiles = (board: Board, direction: string): { board: Board; scor
   if (isGameOver(newBoard)) alert("Game over!");
 
   return { board: newBoard, score };
+};
+
+let previousBoard: Board | null = null;
+let previousScore: number | null = null;
+
+export const undoMove = (): { board: Board; score: number } | null => {  
+  if (previousBoard && previousScore !== null) {
+    return { board: previousBoard, score: previousScore };
+  }
+  return null;
 };

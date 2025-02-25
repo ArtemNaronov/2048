@@ -4,6 +4,7 @@
     <div class="score-board">
       <p>Счёт: {{ score }}</p>
     </div>
+    
     <div class="board" ref="boardRef">
       <div
         v-for="tile in board"
@@ -15,13 +16,16 @@
         {{ tile.value !== 0 ? tile.value : "" }}
       </div>
     </div>
-    <button @click="startGame" class="board-restart">Перезапуск</button>
+    <div class="board__btns">
+      <button @click="startGame" class="board-restart">Перезапуск</button>
+      <button @click="undoLastMove" class="undo-button">Отменить</button>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, onMounted, onBeforeUnmount, computed } from "vue";
-import { initBoard, moveTiles } from "../utils/game";
+import { initBoard, moveTiles, undoMove } from "../utils/game";
 
 // Определение интерфейса плитки
 interface Tile {
@@ -48,7 +52,7 @@ const startGame = (): void => {
 
 // Обработка движения плиток
 const handleMove = (direction: "ArrowLeft" | "ArrowRight" | "ArrowUp" | "ArrowDown"): void => {
-  const { board: newBoard, score: newScore } = moveTiles(board.value, direction);
+  const { board: newBoard, score: newScore } = moveTiles(board.value, direction, score.value);
   board.value = newBoard;
   score.value += newScore;
 };
@@ -61,14 +65,21 @@ const handleKeyDown = (event: KeyboardEvent): void => {
   }
 };
 
+// Обработчик движения пальца (отключаем прокрутку)
+const handleTouchMove = (event: TouchEvent): void => {
+  event.preventDefault(); // Отключаем прокрутку страницы
+};
+
 // Обработчик начала касания (мобильные устройства)
 const handleTouchStart = (event: TouchEvent): void => {
+  event.preventDefault(); 
   touchStartX = event.touches[0].clientX;
   touchStartY = event.touches[0].clientY;
 };
 
 // Обработчик окончания касания
 const handleTouchEnd = (event: TouchEvent): void => {
+  event.preventDefault(); // Отключаем стандартное поведение
   const touchEndX = event.changedTouches[0].clientX;
   const touchEndY = event.changedTouches[0].clientY;
   detectSwipe(touchStartX, touchStartY, touchEndX, touchEndY);
@@ -91,10 +102,13 @@ const handleMouseUp = (event: MouseEvent): void => {
 const detectSwipe = (startX: number, startY: number, endX: number, endY: number): void => {
   const diffX = startX - endX;
   const diffY = startY - endY;
-  if (Math.abs(diffX) > Math.abs(diffY)) {
-    handleMove(diffX > 0 ? "ArrowLeft" : "ArrowRight");
-  } else {
-    handleMove(diffY > 0 ? "ArrowUp" : "ArrowDown");
+  
+  if(Math.abs(diffY) > 10 || Math.abs(diffX) > 10) {
+    if (Math.abs(diffX) > Math.abs(diffY)) {
+      handleMove(diffX > 0 ? "ArrowLeft" : "ArrowRight");
+    } else {
+      handleMove(diffY > 0 ? "ArrowUp" : "ArrowDown");
+    }
   }
 };
 
@@ -111,16 +125,24 @@ const tileStyles = computed<Record<number, Record<number, { transform: string }>
 
 onMounted(() => {
   startGame();
-  window.addEventListener("keydown", handleKeyDown);
-  document.addEventListener("touchstart", handleTouchStart, false);
-  document.addEventListener("touchend", handleTouchEnd, false);
+  document.addEventListener("touchstart", handleTouchStart, { passive: false });
+  document.addEventListener("touchmove", handleTouchMove, { passive: false });
+  document.addEventListener("touchend", handleTouchEnd, { passive: false });
 });
 
 onBeforeUnmount(() => {
-  window.removeEventListener("keydown", handleKeyDown);
   document.removeEventListener("touchstart", handleTouchStart);
+  document.removeEventListener("touchmove", handleTouchMove);
   document.removeEventListener("touchend", handleTouchEnd);
 });
+
+const undoLastMove = (): void => {
+  const previousState = undoMove();
+  if (previousState) {
+    board.value = previousState.board;
+    score.value = previousState.score;
+  }
+};
 </script>
 
 <style scoped>
@@ -152,6 +174,15 @@ onBeforeUnmount(() => {
   padding: 20px;
 }
 
+.board__btns {
+  display: flex;
+  gap: 10px;
+}
+
+.board-restart {
+  background-color: #f67c5f;
+}
+
 h1 {
   color: #f67c5f;
 }
@@ -170,6 +201,33 @@ h1 {
   border-radius: 5px;
   transition: transform 0.2s ease-in-out;
   user-select: none;
+}
+
+.undo-button {
+  background-color: #8f7a66; /* Коричневый цвет в стиле 2048 */
+  color: #fff;
+  border: none;
+  padding: 12px 20px;
+  font-size: 18px;
+  font-weight: bold;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease-in-out;
+  box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.2);
+}
+
+.undo-button:hover {
+  background-color: #a58d7f; /* Светлее при наведении */
+}
+
+.undo-button:active {
+  transform: scale(0.95); /* Небольшой эффект нажатия */
+}
+
+.undo-button:disabled {
+  background-color: #ccc;
+  cursor: not-allowed;
+  box-shadow: none;
 }
 
 .tile-2 {
