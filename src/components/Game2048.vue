@@ -72,6 +72,7 @@ const handleTouchMove = (event: TouchEvent): void => {
 
 // Обработчик начала касания (мобильные устройства)
 const handleTouchStart = (event: TouchEvent): void => {
+  if ((event.target as HTMLElement).closest("button")) return;
   event.preventDefault(); 
   touchStartX = event.touches[0].clientX;
   touchStartY = event.touches[0].clientY;
@@ -79,6 +80,7 @@ const handleTouchStart = (event: TouchEvent): void => {
 
 // Обработчик окончания касания
 const handleTouchEnd = (event: TouchEvent): void => {
+  if ((event.target as HTMLElement).closest("button")) return;
   event.preventDefault(); // Отключаем стандартное поведение
   const touchEndX = event.changedTouches[0].clientX;
   const touchEndY = event.changedTouches[0].clientY;
@@ -112,6 +114,10 @@ const detectSwipe = (startX: number, startY: number, endX: number, endY: number)
   }
 };
 
+document.addEventListener("touchmove", (event) => {
+  event.preventDefault();
+}, { passive: false });
+
 // Вычисляем стили для плиток
 const tileStyles = computed<Record<number, Record<number, { transform: string }>>>(() =>
   board.value.reduce((acc, tile) => {
@@ -125,14 +131,14 @@ const tileStyles = computed<Record<number, Record<number, { transform: string }>
 
 onMounted(() => {
   startGame();
-  window.addEventListener("keydown", handleKeyDown);
+  document.addEventListener("keydown", handleKeyDown);
   document.addEventListener("touchstart", handleTouchStart, { passive: false });
   document.addEventListener("touchmove", handleTouchMove, { passive: false });
   document.addEventListener("touchend", handleTouchEnd, { passive: false });
 });
 
 onBeforeUnmount(() => {
-  window.removeEventListener("keydown", handleKeyDown);
+  document.removeEventListener("keydown", handleKeyDown);
   document.removeEventListener("touchstart", handleTouchStart);
   document.removeEventListener("touchmove", handleTouchMove);
   document.removeEventListener("touchend", handleTouchEnd);
@@ -155,7 +161,7 @@ const undoLastMove = (): void => {
   height: 100vh;
   width: 100vw;
   background: #faf8ef;
-  padding-top: 20px;
+  padding-bottom: 60px;
   justify-content: center;
 }
 
