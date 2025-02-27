@@ -178,7 +178,7 @@ const tileStyles = computed<
   }, {} as Record<number, Record<number, { transform: string }>>)
 );
 
-const theme = ref<string | null>('classic')
+const theme = ref<string | null>("classic");
 
 onMounted(() => {
   startGame();
@@ -186,17 +186,20 @@ onMounted(() => {
   if (localStorage.getItem("theme")) {
     theme.value = localStorage.getItem("theme");
   }
-  if (localStorage.getItem("board")) {
-    board.value = JSON.parse(localStorage.getItem("board"));
-  }
-  score.value = parseInt(localStorage.getItem("score")) || 0;
-  best_score.value = parseInt(localStorage.getItem("best_score")) || 0;
+  board.value = getStoredData("board", []) as Board;
+  score.value = getStoredData("score", 0) as number;
+  best_score.value = getStoredData("best_score", 0) as number;
 
   document.addEventListener("keydown", handleKeyDown);
   document.addEventListener("touchstart", handleTouchStart, { passive: false });
   document.addEventListener("touchmove", handleTouchMove, { passive: false });
   document.addEventListener("touchend", handleTouchEnd, { passive: false });
 });
+
+const getStoredData = (key: string, defaultValue: any) => {
+  const storedValue = localStorage.getItem(key);
+  return storedValue ? JSON.parse(storedValue) : defaultValue;
+};
 
 onBeforeUnmount(() => {
   document.removeEventListener("keydown", handleKeyDown);
@@ -213,14 +216,13 @@ const undoLastMove = (): void => {
   }
 };
 
-
-const show = ref<boolean>(false)
+const show = ref<boolean>(false);
 const showModal = (): void => {
-  show.value = !show.value
-}
+  show.value = !show.value;
+};
 const changeTheme = (newTheme: string): void => {
-  theme.value = newTheme
-}
+  theme.value = newTheme;
+};
 </script>
 
 <style scoped lang="scss">
