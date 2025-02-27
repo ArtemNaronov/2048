@@ -1,8 +1,14 @@
 <template>
-  <div class="game-container" :class="theme" @mousedown="handleMouseDown" @mouseup="handleMouseUp">
+  <div
+    class="game-container"
+    :class="theme"
+    @mousedown="handleMouseDown"
+    @mouseup="handleMouseUp"
+  >
     <h1>2048</h1>
     <div class="score-board">
       <p>Счёт: {{ score }}</p>
+      <p>Лучший счёт: {{ best_score }}</p>
     </div>
     <button class="board-setting" @click="showModal">
       <Setting />
@@ -45,10 +51,13 @@ type Board = Tile[];
 
 const board = ref<Board>([]);
 const score = ref<number>(0);
+const best_score = ref<number>(0);
 const boardRef = ref<HTMLDivElement | null>(null);
 
-let touchStartX = 0, touchStartY = 0;
-let mouseStartX = 0, mouseStartY = 0;
+let touchStartX = 0,
+  touchStartY = 0;
+let mouseStartX = 0,
+  mouseStartY = 0;
 
 // Запуск новой игры
 const startGame = (): void => {
@@ -57,17 +66,40 @@ const startGame = (): void => {
 };
 
 // Обработка движения плиток
-const handleMove = (direction: "ArrowLeft" | "ArrowRight" | "ArrowUp" | "ArrowDown"): void => {
-  const { board: newBoard, score: newScore } = moveTiles(board.value, direction, score.value);
+const handleMove = (
+  direction: "ArrowLeft" | "ArrowRight" | "ArrowUp" | "ArrowDown"
+): void => {
+  const { board: newBoard, score: newScore } = moveTiles(
+    board.value,
+    direction,
+    score.value
+  );
   board.value = newBoard;
   score.value += newScore;
+
+  if (score.value > best_score.value) {
+    console.log("kjh");
+
+    best_score.value = score.value;
+    localStorage.setItem("best_score", String(best_score.value));
+  }
+
+  localStorage.setItem("board", JSON.stringify(board.value));
+  localStorage.setItem("score", String(score.value));
 };
 
 // Обработчик событий клавиатуры
 const handleKeyDown = (event: KeyboardEvent): void => {
-  const validKeys = ["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"] as const;
+  const validKeys = [
+    "ArrowLeft",
+    "ArrowRight",
+    "ArrowUp",
+    "ArrowDown",
+  ] as const;
   if (validKeys.includes(event.key as any)) {
-    handleMove(event.key as "ArrowLeft" | "ArrowRight" | "ArrowUp" | "ArrowDown");
+    handleMove(
+      event.key as "ArrowLeft" | "ArrowRight" | "ArrowUp" | "ArrowDown"
+    );
   }
 };
 
@@ -79,7 +111,7 @@ const handleTouchMove = (event: TouchEvent): void => {
 // Обработчик начала касания (мобильные устройства)
 const handleTouchStart = (event: TouchEvent): void => {
   if ((event.target as HTMLElement).closest("button")) return;
-  event.preventDefault(); 
+  event.preventDefault();
   touchStartX = event.touches[0].clientX;
   touchStartY = event.touches[0].clientY;
 };
@@ -107,11 +139,16 @@ const handleMouseUp = (event: MouseEvent): void => {
 };
 
 // Определение направления свайпа
-const detectSwipe = (startX: number, startY: number, endX: number, endY: number): void => {
+const detectSwipe = (
+  startX: number,
+  startY: number,
+  endX: number,
+  endY: number
+): void => {
   const diffX = startX - endX;
   const diffY = startY - endY;
-  
-  if(Math.abs(diffY) > 10 || Math.abs(diffX) > 10) {
+
+  if (Math.abs(diffY) > 10 || Math.abs(diffX) > 10) {
     if (Math.abs(diffX) > Math.abs(diffY)) {
       handleMove(diffX > 0 ? "ArrowLeft" : "ArrowRight");
     } else {
@@ -120,29 +157,41 @@ const detectSwipe = (startX: number, startY: number, endX: number, endY: number)
   }
 };
 
-document.addEventListener("touchmove", (event) => {
-  event.preventDefault();
-}, { passive: false });
+document.addEventListener(
+  "touchmove",
+  (event) => {
+    event.preventDefault();
+  },
+  { passive: false }
+);
 
 // Вычисляем стили для плиток
-const tileStyles = computed<Record<number, Record<number, { transform: string }>>>(() =>
+const tileStyles = computed<
+  Record<number, Record<number, { transform: string }>>
+>(() =>
   board.value.reduce((acc, tile) => {
     acc[tile.x] = acc[tile.x] || {};
     acc[tile.x][tile.y] = {
-      transform: `translate(${tile.x * 90}px, ${tile.y * 90}px)`
+      transform: `translate(${tile.x * 90}px, ${tile.y * 90}px)`,
     };
     return acc;
   }, {} as Record<number, Record<number, { transform: string }>>)
 );
 
-const theme = ref('classic')
+const theme = ref("classic");
 
 onMounted(() => {
-  if(localStorage.getItem('theme')) {
-    theme.value = localStorage.getItem('theme')
-  }
-  
   startGame();
+
+  if (localStorage.getItem("theme")) {
+    theme.value = localStorage.getItem("theme");
+  }
+  if (localStorage.getItem("board")) {
+    board.value = JSON.parse(localStorage.getItem("board"));
+  }
+  score.value = parseInt(localStorage.getItem("score")) || 0;
+  best_score.value = parseInt(localStorage.getItem("best_score")) || 0;
+
   document.addEventListener("keydown", handleKeyDown);
   document.addEventListener("touchstart", handleTouchStart, { passive: false });
   document.addEventListener("touchmove", handleTouchMove, { passive: false });
@@ -164,61 +213,126 @@ const undoLastMove = (): void => {
   }
 };
 
-
-const show = ref<Boolean>(false)
+const show = ref<Boolean>(false);
 const showModal = (): void => {
-  show.value = !show.value
-}
+  show.value = !show.value;
+};
 const changeTheme = (newTheme): void => {
-  theme.value = newTheme
-}
+  theme.value = newTheme;
+};
 </script>
 
 <style scoped lang="scss">
-$color-bg: #F8E8F8;
+$color-bg: #f8e8f8;
 $color-board: #8e5aaf;
-$color-tile: #E0B0FF;
-$color-text: #4A235A;
-$color-restart: #E6A8FF;
-$color-title: #A24587;
-$color-button: #B076C9;
-$color-button-hover: #A24587;
+$color-tile: #e0b0ff;
+$color-text: #4a235a;
+$color-restart: #e6a8ff;
+$color-title: #a24587;
+$color-button: #b076c9;
+$color-button-hover: #a24587;
 
 $tile-colors: (
-  2: (#FAD2E1, #4A235A),
-  4: (#E8A2DC, #4A235A),
-  8: (#D48AC1, #f9f6f2),
-  16: (#C774B0, #f9f6f2),
-  32: (#B35A9B, #f9f6f2),
-  64: (#A24587, #f9f6f2),
-  128: (#902F74, #f9f6f2),
-  256: (#7E1D62, #f9f6f2),
-  512: (#6D0B51, #f9f6f2),
-  1024: (#5B003F, #f9f6f2),
-  2048: (#48002D, #f9f6f2)
+  2: (
+    #fad2e1,
+    #4a235a,
+  ),
+  4: (
+    #e8a2dc,
+    #4a235a,
+  ),
+  8: (
+    #d48ac1,
+    #f9f6f2,
+  ),
+  16: (
+    #c774b0,
+    #f9f6f2,
+  ),
+  32: (
+    #b35a9b,
+    #f9f6f2,
+  ),
+  64: (
+    #a24587,
+    #f9f6f2,
+  ),
+  128: (
+    #902f74,
+    #f9f6f2,
+  ),
+  256: (
+    #7e1d62,
+    #f9f6f2,
+  ),
+  512: (
+    #6d0b51,
+    #f9f6f2,
+  ),
+  1024: (
+    #5b003f,
+    #f9f6f2,
+  ),
+  2048: (
+    #48002d,
+    #f9f6f2,
+  ),
 );
 
-$color-bg-blue: #E0F1FF;
-$color-board-blue: #2E3C87;
-$color-tile-blue: #A0C4FF;
-$color-text-blue: #003F88;
-$color-restart-blue: #A1C6EA;
-$color-title-blue: #003F88;
-$color-button-blue: #669BBC;
-$color-button-hover-blue: #4A86D9;
+$color-bg-blue: #e0f1ff;
+$color-board-blue: #2e3c87;
+$color-tile-blue: #a0c4ff;
+$color-text-blue: #003f88;
+$color-restart-blue: #a1c6ea;
+$color-title-blue: #003f88;
+$color-button-blue: #669bbc;
+$color-button-hover-blue: #4a86d9;
 
 $tile-colors-blue: (
-  2: (#D0E4F1, #003F88),
-  4: (#A1C6EA, #003F88),
-  8: (#7FA0D7, #f9f6f2),
-  16: (#6788C2, #f9f6f2),
-  32: (#5671A6, #f9f6f2),
-  64: (#4A86D9, #f9f6f2),
-  128: (#3B63A1, #f9f6f2),
-  256: (#2E3C87, #f9f6f2),
-  512: (#1F3170, #f9f6f2),
-  1024: (#14224F, #f9f6f2),
-  2048: (#0F173B, #f9f6f2)
+  2: (
+    #d0e4f1,
+    #003f88,
+  ),
+  4: (
+    #a1c6ea,
+    #003f88,
+  ),
+  8: (
+    #7fa0d7,
+    #f9f6f2,
+  ),
+  16: (
+    #6788c2,
+    #f9f6f2,
+  ),
+  32: (
+    #5671a6,
+    #f9f6f2,
+  ),
+  64: (
+    #4a86d9,
+    #f9f6f2,
+  ),
+  128: (
+    #3b63a1,
+    #f9f6f2,
+  ),
+  256: (
+    #2e3c87,
+    #f9f6f2,
+  ),
+  512: (
+    #1f3170,
+    #f9f6f2,
+  ),
+  1024: (
+    #14224f,
+    #f9f6f2,
+  ),
+  2048: (
+    #0f173b,
+    #f9f6f2,
+  ),
 );
 
 .game-container {
@@ -233,7 +347,7 @@ $tile-colors-blue: (
 
   &.design {
     &__pink {
-      background: linear-gradient(-45deg, #E0B0FF, #D48AC1, #A24587, #E0B0FF);
+      background: linear-gradient(-45deg, #e0b0ff, #d48ac1, #a24587, #e0b0ff);
       background-size: 400% 400%;
       animation: gradientAnimation 10s ease infinite;
 
@@ -272,9 +386,15 @@ $tile-colors-blue: (
       .undo-button:hover {
         background-color: $color-button-hover;
       }
-    } 
+    }
     &__blue {
-      background: linear-gradient(-45deg, $color-bg-blue, $color-board-blue, $color-tile-blue, $color-bg-blue);
+      background: linear-gradient(
+        -45deg,
+        $color-bg-blue,
+        $color-board-blue,
+        $color-tile-blue,
+        $color-bg-blue
+      );
       background-size: 400% 400%;
       animation: gradientAnimation 10s ease infinite;
 
