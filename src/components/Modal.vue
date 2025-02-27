@@ -23,25 +23,33 @@
     </div>
 </template>
 
-<script setup>
-import { ref } from "vue";
+<script setup lang="ts">
 import Close from "./Close.vue";
 
-defineProps({
-  show: Boolean,
-})
+// Типизация для props
+interface ModalProps {
+  show: boolean;
+}
 
-const emit = defineEmits(['close', 'changeTheme'])
+defineProps<ModalProps>();
+
+// Типизация для событий
+interface EmitEvents {
+  (e: 'close'): void;
+  (e: 'changeTheme', theme: string): void;
+}
+
+const emit = defineEmits<EmitEvents>();
 
 const close = () => {
-    emit('close')
-}
+  emit('close');
+};
 
-const setTheme = (theme) => {
-    localStorage.setItem('theme', theme);
-    emit('changeTheme', theme);
-    emit('close')
-}
+const setTheme = (theme: 'classic' | 'design__pink' | 'design__blue') => {
+  localStorage.setItem('theme', theme);
+  emit('changeTheme', theme);
+  emit('close');
+};
 </script>
 
 <style scoped lang="scss">

@@ -135,7 +135,7 @@ const tileStyles = computed<Record<number, Record<number, { transform: string }>
   }, {} as Record<number, Record<number, { transform: string }>>)
 );
 
-const theme = ref('classic')
+const theme = ref<string | null>('classic')
 
 onMounted(() => {
   if(localStorage.getItem('theme')) {
@@ -165,11 +165,11 @@ const undoLastMove = (): void => {
 };
 
 
-const show = ref<Boolean>(false)
+const show = ref<boolean>(false)
 const showModal = (): void => {
   show.value = !show.value
 }
-const changeTheme = (newTheme): void => {
+const changeTheme = (newTheme: string): void => {
   theme.value = newTheme
 }
 </script>
