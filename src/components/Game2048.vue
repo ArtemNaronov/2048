@@ -8,9 +8,9 @@
     <h1>2048</h1>
     <div class="score-board">
       <p>Счёт: {{ score }}</p>
-      <p>Лучший счёт: {{ best_score }}</p>
+      <p>Лучший счёт: {{ bestScore }}</p>
     </div>
-    <button class="board-setting" @click="showModal">
+    <button class="board-setting" @click="toggleModal" aria-label="Настройки">
       <Setting />
     </button>
     <div class="board" ref="boardRef">
@@ -18,8 +18,8 @@
         v-for="tile in board"
         :key="`${tile.x}-${tile.y}`"
         class="tile"
-        :class="'tile-' + tile.value"
-        :style="tileStyles[tile.x]?.[tile.y]"
+        :class="`tile-${tile.value}`"
+        :style="getTileStyle(tile)"
       >
         {{ tile.value !== 0 ? tile.value : "" }}
       </div>
@@ -29,7 +29,7 @@
       <button @click="undoLastMove" class="undo-button">Отменить</button>
     </div>
 
-    <Modal :show="show" @close="showModal" @changeTheme="changeTheme" />
+    <Modal :show="showModal" @close="toggleModal" @change-theme="changeTheme" />
   </div>
 </template>
 
@@ -51,24 +51,37 @@ type Board = Tile[];
 
 const board = ref<Board>([]);
 const score = ref<number>(0);
-const best_score = ref<number>(0);
+const bestScore = ref<number>(0);
 const boardRef = ref<HTMLDivElement | null>(null);
+const showModal = ref<boolean>(false);
+const theme = ref<string>("classic");
 
-let touchStartX = 0,
-  touchStartY = 0;
-let mouseStartX = 0,
-  mouseStartY = 0;
+const touchStart = ref({ x: 0, y: 0 });
+const mouseStart = ref({ x: 0, y: 0 });
+
+const SWIPE_THRESHOLD = 10;
+const VALID_KEYS = ["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"] as const;
+type Direction = typeof VALID_KEYS[number];
+
+const tileStyles = computed(() => {
+  return board.value.reduce((acc, tile) => {
+    if (!acc[tile.x]) acc[tile.x] = {};
+    acc[tile.x][tile.y] = {
+      transform: `translate(${tile.x * 90}px, ${tile.y * 90}px)`,
+    };
+    return acc;
+  }, {} as Record<number, Record<number, { transform: string }>>);
+});
 
 // Запуск новой игры
 const startGame = (): void => {
   board.value = initBoard();
   score.value = 0;
+  saveGameState();
 };
 
 // Обработка движения плиток
-const handleMove = (
-  direction: "ArrowLeft" | "ArrowRight" | "ArrowUp" | "ArrowDown"
-): void => {
+const handleMove = (direction: Direction): void => {
   const { board: newBoard, score: newScore } = moveTiles(
     board.value,
     direction,
@@ -77,65 +90,59 @@ const handleMove = (
   board.value = newBoard;
   score.value += newScore;
 
-  if (score.value > best_score.value) {
-    console.log("kjh");
-
-    best_score.value = score.value;
-    localStorage.setItem("best_score", String(best_score.value));
+  if (score.value > bestScore.value) {
+    bestScore.value = score.value;
+    localStorage.setItem("best_score", String(bestScore.value));
   }
 
-  localStorage.setItem("board", JSON.stringify(board.value));
-  localStorage.setItem("score", String(score.value));
+  saveGameState();
 };
 
 // Обработчик событий клавиатуры
 const handleKeyDown = (event: KeyboardEvent): void => {
-  const validKeys = [
-    "ArrowLeft",
-    "ArrowRight",
-    "ArrowUp",
-    "ArrowDown",
-  ] as const;
-  if (validKeys.includes(event.key as any)) {
-    handleMove(
-      event.key as "ArrowLeft" | "ArrowRight" | "ArrowUp" | "ArrowDown"
-    );
+  if (VALID_KEYS.includes(event.key as Direction)) {
+    handleMove(event.key as Direction);
   }
 };
 
-// Обработчик движения пальца (отключаем прокрутку)
-const handleTouchMove = (event: TouchEvent): void => {
-  event.preventDefault(); // Отключаем прокрутку страницы
-};
-
-// Обработчик начала касания (мобильные устройства)
+// Обработчик начала касания 
 const handleTouchStart = (event: TouchEvent): void => {
   if ((event.target as HTMLElement).closest("button")) return;
   event.preventDefault();
-  touchStartX = event.touches[0].clientX;
-  touchStartY = event.touches[0].clientY;
+  touchStart.value = {
+    x: event.touches[0].clientX,
+    y: event.touches[0].clientY,
+  };
 };
 
 // Обработчик окончания касания
 const handleTouchEnd = (event: TouchEvent): void => {
   if ((event.target as HTMLElement).closest("button")) return;
-  event.preventDefault(); // Отключаем стандартное поведение
-  const touchEndX = event.changedTouches[0].clientX;
-  const touchEndY = event.changedTouches[0].clientY;
-  detectSwipe(touchStartX, touchStartY, touchEndX, touchEndY);
+  event.preventDefault();
+  detectSwipe(
+    touchStart.value.x,
+    touchStart.value.y,
+    event.changedTouches[0].clientX,
+    event.changedTouches[0].clientY
+  );
 };
 
 // Обработчик начала нажатия мыши
 const handleMouseDown = (event: MouseEvent): void => {
-  mouseStartX = event.clientX;
-  mouseStartY = event.clientY;
+  mouseStart.value = {
+    x: event.clientX,
+    y: event.clientY,
+  };
 };
 
 // Обработчик окончания нажатия мыши
 const handleMouseUp = (event: MouseEvent): void => {
-  const mouseEndX = event.clientX;
-  const mouseEndY = event.clientY;
-  detectSwipe(mouseStartX, mouseStartY, mouseEndX, mouseEndY);
+  detectSwipe(
+    mouseStart.value.x,
+    mouseStart.value.y,
+    event.clientX,
+    event.clientY
+  );
 };
 
 // Определение направления свайпа
@@ -148,333 +155,262 @@ const detectSwipe = (
   const diffX = startX - endX;
   const diffY = startY - endY;
 
-  if (Math.abs(diffY) > 10 || Math.abs(diffX) > 10) {
-    if (Math.abs(diffX) > Math.abs(diffY)) {
-      handleMove(diffX > 0 ? "ArrowLeft" : "ArrowRight");
-    } else {
-      handleMove(diffY > 0 ? "ArrowUp" : "ArrowDown");
-    }
+  if (Math.abs(diffY) > SWIPE_THRESHOLD || Math.abs(diffX) > SWIPE_THRESHOLD) {
+    handleMove(
+      Math.abs(diffX) > Math.abs(diffY)
+        ? diffX > 0
+          ? "ArrowLeft"
+          : "ArrowRight"
+        : diffY > 0
+        ? "ArrowUp"
+        : "ArrowDown"
+    );
   }
 };
 
-document.addEventListener(
-  "touchmove",
-  (event) => {
-    event.preventDefault();
-  },
-  { passive: false }
-);
+const getTileStyle = (tile: Tile) => {
+  return tileStyles.value[tile.x]?.[tile.y];
+};
 
-// Вычисляем стили для плиток
-const tileStyles = computed<
-  Record<number, Record<number, { transform: string }>>
->(() =>
-  board.value.reduce((acc, tile) => {
-    acc[tile.x] = acc[tile.x] || {};
-    acc[tile.x][tile.y] = {
-      transform: `translate(${tile.x * 90}px, ${tile.y * 90}px)`,
-    };
-    return acc;
-  }, {} as Record<number, Record<number, { transform: string }>>)
-);
+const saveGameState = (): void => {
+  localStorage.setItem("board", JSON.stringify(board.value));
+  localStorage.setItem("score", String(score.value));
+};
 
-const theme = ref<string | null>("classic");
-
-onMounted(() => {
-  startGame();
-
-  if (localStorage.getItem("theme")) {
-    theme.value = localStorage.getItem("theme");
-  }
-  board.value = getStoredData("board", []) as Board;
-  score.value = getStoredData("score", 0) as number;
-  best_score.value = getStoredData("best_score", 0) as number;
-
-  document.addEventListener("keydown", handleKeyDown);
-  document.addEventListener("touchstart", handleTouchStart, { passive: false });
-  document.addEventListener("touchmove", handleTouchMove, { passive: false });
-  document.addEventListener("touchend", handleTouchEnd, { passive: false });
-});
-
-const getStoredData = (key: string, defaultValue: any) => {
+const loadStoredData = <T>(key: string, defaultValue: T): T => {
   const storedValue = localStorage.getItem(key);
   return storedValue ? JSON.parse(storedValue) : defaultValue;
 };
-
-onBeforeUnmount(() => {
-  document.removeEventListener("keydown", handleKeyDown);
-  document.removeEventListener("touchstart", handleTouchStart);
-  document.removeEventListener("touchmove", handleTouchMove);
-  document.removeEventListener("touchend", handleTouchEnd);
-});
 
 const undoLastMove = (): void => {
   const previousState = undoMove();
   if (previousState) {
     board.value = previousState.board;
     score.value = previousState.score;
+    saveGameState();
   }
 };
 
-const show = ref<boolean>(false);
-const showModal = (): void => {
-  show.value = !show.value;
+const toggleModal = (): void => {
+  showModal.value = !showModal.value;
 };
 const changeTheme = (newTheme: string): void => {
   theme.value = newTheme;
+  localStorage.setItem("theme", newTheme);
 };
+
+onMounted(() => {
+  startGame();
+
+  const storedTheme = localStorage.getItem("theme");
+  if (storedTheme) theme.value = storedTheme;
+
+  board.value = loadStoredData<Board>("board", []);
+  score.value = loadStoredData<number>("score", 0);
+  bestScore.value = loadStoredData<number>("best_score", 0);
+
+  document.addEventListener("keydown", handleKeyDown);
+  document.addEventListener("touchstart", handleTouchStart, { passive: false });
+  document.addEventListener("touchmove", preventScroll, { passive: false });
+  document.addEventListener("touchend", handleTouchEnd, { passive: false });
+});
+
+const preventScroll = (event: TouchEvent) => {
+  event.preventDefault();
+};
+
+onBeforeUnmount(() => {
+  document.removeEventListener("keydown", handleKeyDown);
+  document.removeEventListener("touchstart", handleTouchStart);
+  document.removeEventListener("touchmove", preventScroll);
+  document.removeEventListener("touchend", handleTouchEnd);
+});
 </script>
 
 <style scoped lang="scss">
-$color-bg: #f8e8f8;
-$color-board: #8e5aaf;
-$color-tile: #e0b0ff;
-$color-text: #4a235a;
-$color-restart: #e6a8ff;
-$color-title: #a24587;
-$color-button: #b076c9;
-$color-button-hover: #a24587;
+$base-transition: all 0.2s ease-in-out;
+$base-shadow: 2px 2px 5px rgba(0, 0, 0, 0.2);
+$base-border-radius: 8px;
 
-$tile-colors: (
-  2: (
-    #fad2e1,
-    #4a235a,
-  ),
-  4: (
-    #e8a2dc,
-    #4a235a,
-  ),
-  8: (
-    #d48ac1,
-    #f9f6f2,
-  ),
-  16: (
-    #c774b0,
-    #f9f6f2,
-  ),
-  32: (
-    #b35a9b,
-    #f9f6f2,
-  ),
-  64: (
-    #a24587,
-    #f9f6f2,
-  ),
-  128: (
-    #902f74,
-    #f9f6f2,
-  ),
-  256: (
-    #7e1d62,
-    #f9f6f2,
-  ),
-  512: (
-    #6d0b51,
-    #f9f6f2,
-  ),
-  1024: (
-    #5b003f,
-    #f9f6f2,
-  ),
-  2048: (
-    #48002d,
-    #f9f6f2,
-  ),
+$classic-colors: (
+  bg: #faf8ef,
+  board: #bbada0,
+  tile: #cdc1b4,
+  text: #776e65,
+  restart: #f67c5f,
+  title: #776e65,
+  button: #8f7a66,
+  button-hover: #a58d7f,
 );
 
-$color-bg-blue: #e0f1ff;
-$color-board-blue: #2e3c87;
-$color-tile-blue: #a0c4ff;
-$color-text-blue: #003f88;
-$color-restart-blue: #a1c6ea;
-$color-title-blue: #003f88;
-$color-button-blue: #669bbc;
-$color-button-hover-blue: #4a86d9;
-
-$tile-colors-blue: (
-  2: (
-    #d0e4f1,
-    #003f88,
-  ),
-  4: (
-    #a1c6ea,
-    #003f88,
-  ),
-  8: (
-    #7fa0d7,
-    #f9f6f2,
-  ),
-  16: (
-    #6788c2,
-    #f9f6f2,
-  ),
-  32: (
-    #5671a6,
-    #f9f6f2,
-  ),
-  64: (
-    #4a86d9,
-    #f9f6f2,
-  ),
-  128: (
-    #3b63a1,
-    #f9f6f2,
-  ),
-  256: (
-    #2e3c87,
-    #f9f6f2,
-  ),
-  512: (
-    #1f3170,
-    #f9f6f2,
-  ),
-  1024: (
-    #14224f,
-    #f9f6f2,
-  ),
-  2048: (
-    #0f173b,
-    #f9f6f2,
-  ),
+// Pink theme
+$pink-colors: (
+  bg: linear-gradient(-45deg, #e0b0ff, #d48ac1, #a24587, #e0b0ff),
+  board: #8e5aaf,
+  tile: #e0b0ff,
+  text: #4a235a,
+  restart: #e6a8ff,
+  title: #a24587,
+  button: #b076c9,
+  button-hover: #a24587,
 );
 
+// Blue theme
+$blue-colors: (
+  bg: linear-gradient(-45deg, #e0f1ff, #2e3c87, #a0c4ff, #e0f1ff),
+  board: #2e3c87,
+  tile: #a0c4ff,
+  text: #003f88,
+  restart: #a1c6ea,
+  title: #003f88,
+  button: #669bbc,
+  button-hover: #4a86d9,
+);
+
+
+// Base styles
 .game-container {
   display: flex;
   flex-direction: column;
   align-items: center;
-  height: 100vh;
-  width: 100vw;
-  background: #faf8ef;
-  padding-bottom: 60px;
   justify-content: center;
+  min-height: 100vh;
+  width: 100vw;
+  padding: 20px;
+  box-sizing: border-box;
+  background: map-get($classic-colors, bg);
+  transition: $base-transition;
 
   &.design {
     &__pink {
-      background: linear-gradient(-45deg, #e0b0ff, #d48ac1, #a24587, #e0b0ff);
+      background: map-get($pink-colors, bg);
       background-size: 400% 400%;
       animation: gradientAnimation 10s ease infinite;
 
       .score-board {
-        color: $color-text;
+        color: map-get($pink-colors, text);
       }
 
       .board {
-        background: $color-board;
+        background: map-get($pink-colors, board);
       }
 
       .board-restart {
-        background-color: $color-restart;
+        background-color: map-get($pink-colors, restart);
       }
 
       h1 {
-        color: $color-title;
-        text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+        color: map-get($pink-colors, title);
+        text-shadow: $base-shadow;
       }
 
-      .tile {
-        color: $color-text;
-        background: $color-tile;
-      }
-
-      @each $key, $values in $tile-colors {
-        .tile-#{$key} {
-          background: nth($values, 1);
-          color: nth($values, 2);
-        }
-      }
+      // .tile {
+      //   color: map-get($pink-colors, text);
+      //   background: map-get($pink-colors, tile);
+      // }
 
       .undo-button {
-        background-color: $color-button;
-      }
-      .undo-button:hover {
-        background-color: $color-button-hover;
+        background-color: map-get($pink-colors, button);
+        
+        &:hover {
+          background-color: map-get($pink-colors, button-hover);
+        }
       }
     }
+
     &__blue {
-      background: linear-gradient(
-        -45deg,
-        $color-bg-blue,
-        $color-board-blue,
-        $color-tile-blue,
-        $color-bg-blue
-      );
+      background: map-get($blue-colors, bg);
       background-size: 400% 400%;
       animation: gradientAnimation 10s ease infinite;
 
       .score-board {
-        color: $color-text-blue;
+        color: map-get($blue-colors, text);
       }
 
       .board {
-        background: $color-board-blue;
+        background: map-get($blue-colors, board);
       }
 
       .board-restart {
-        background-color: $color-restart-blue;
+        background-color: map-get($blue-colors, restart);
       }
 
       h1 {
-        color: $color-title-blue;
-        text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+        color: map-get($blue-colors, title);
+        text-shadow: $base-shadow;
       }
 
-      .tile {
-        color: $color-text-blue;
-        background: $color-tile-blue;
-      }
-
-      @each $key, $values in $tile-colors-blue {
-        .tile-#{$key} {
-          background: nth($values, 1);
-          color: nth($values, 2);
-        }
-      }
+      // .tile {
+      //   color: map-get($blue-colors, text);
+      //   background: map-get($blue-colors, tile);
+      // }
 
       .undo-button {
-        background-color: $color-button-blue;
-      }
-      .undo-button:hover {
-        background-color: $color-button-hover-blue;
+        background-color: map-get($blue-colors, button);
+        
+        &:hover {
+          background-color: map-get($blue-colors, button-hover);
+        }
       }
     }
   }
 }
 
 .score-board {
-  font-size: 24px;
+  font-size: 1.5rem;
   font-weight: bold;
-  margin-bottom: 20px;
-  color: #776e65;
+  margin: 1rem 0;
+  color: map-get($classic-colors, text);
 }
 
 .board {
   position: relative;
   width: 390px;
   height: 390px;
-  background: #bbada0;
-  border-radius: 10px;
-  margin-bottom: 20px;
+  background: map-get($classic-colors, board);
+  border-radius: $base-border-radius;
+  margin: 1rem 0;
   padding: 20px;
+  box-sizing: border-box;
 }
 
 .board__btns {
   display: flex;
-  gap: 10px;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+
+.board-restart,
+.undo-button {
+  padding: 0.75rem 1.5rem;
+  font-size: 1rem;
+  font-weight: bold;
+  border: none;
+  border-radius: $base-border-radius;
+  cursor: pointer;
+  transition: $base-transition;
+  box-shadow: $base-shadow;
+  color: white;
+
+  &:active {
+    transform: scale(0.95);
+  }
+
+  &:disabled {
+    background-color: #ccc;
+    cursor: not-allowed;
+    box-shadow: none;
+  }
 }
 
 .board-restart {
-  background-color: #f67c5f;
-  color: #fff;
-  font-size: 18px;
-  font-weight: bold;
-  border-radius: 8px;
-  cursor: pointer;
-  transition: all 0.2s ease-in-out;
-  box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.2);
+  background-color: map-get($classic-colors, restart);
 }
 
 h1 {
-  color: #f67c5f;
+  font-size: 3rem;
+  margin: 0.5rem 0;
+  color: map-get($classic-colors, title);
 }
 
 .tile {
@@ -484,91 +420,31 @@ h1 {
   display: flex;
   justify-content: center;
   align-items: center;
-  font-size: 24px;
+  font-size: 1.5rem;
   font-weight: bold;
-  color: #776e65;
-  background: #cdc1b4;
+  color: map-get($classic-colors, text);
+  background: map-get($classic-colors, tile);
   border-radius: 5px;
   transition: transform 0.2s ease-in-out;
   user-select: none;
 }
+
 .undo-button {
-  background-color: #8f7a66; /* Коричневый цвет в стиле 2048 */
-  color: #fff;
-  border: none;
-  padding: 12px 20px;
-  font-size: 18px;
-  font-weight: bold;
-  border-radius: 8px;
-  cursor: pointer;
-  transition: all 0.2s ease-in-out;
-  box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.2);
-}
-
-.undo-button:hover {
-  background-color: #a58d7f; /* Светлее при наведении */
-}
-
-.undo-button:active {
-  transform: scale(0.95); /* Небольшой эффект нажатия */
-}
-
-.undo-button:disabled {
-  background-color: #ccc;
-  cursor: not-allowed;
-  box-shadow: none;
-}
-
-.tile-2 {
-  background: #eee4da;
-}
-.tile-4 {
-  background: #ede0c8;
-}
-.tile-8 {
-  background: #f2b179;
-  color: #f9f6f2;
-}
-.tile-16 {
-  background: #f59563;
-  color: #f9f6f2;
-}
-.tile-32 {
-  background: #f67c5f;
-  color: #f9f6f2;
-}
-.tile-64 {
-  background: #f65e3b;
-  color: #f9f6f2;
-}
-.tile-128 {
-  background: #edcf72;
-  color: #f9f6f2;
-}
-.tile-256 {
-  background: #edcc61;
-  color: #f9f6f2;
-}
-.tile-512 {
-  background: #edc850;
-  color: #f9f6f2;
-}
-.tile-1024 {
-  background: #edc53f;
-  color: #f9f6f2;
-}
-.tile-2048 {
-  background: #edc22e;
-  color: #f9f6f2;
+  background-color: map-get($classic-colors, button);
+  
+  &:hover {
+    background-color: map-get($classic-colors, button-hover);
+  }
 }
 
 .board-setting {
   position: absolute;
-  right: 10px;
-  top: 10px;
-  padding: 20px;
+  right: 1rem;
+  top: 1rem;
+  padding: 1rem;
   background-color: transparent;
   border: none;
+  cursor: pointer;
 }
 
 @keyframes gradientAnimation {
@@ -580,6 +456,64 @@ h1 {
   }
   100% {
     background-position: 0% 50%;
+  }
+}
+
+// Classic tile colors
+@for $i from 1 through 17 {
+  $value: pow(2, $i);
+  .tile-#{$value} {
+    $base-color: #eee4da;
+    $target-color: #edc22e;
+    $dark-color: #3c3a32;
+    
+    background: if($i <= 11, 
+                 mix($base-color, $target-color, percentage(1 - ($i/11))),
+                 $dark-color);
+    color: if($i > 2, #f9f6f2, #776e65);
+    
+    @if $i >= 6 {
+      box-shadow: 0 0 15px 5px rgba(0,0,0,0.1);
+    }
+  }
+}
+.design__pink {
+  @for $i from 1 through 17 {
+    $value: pow(2, $i);
+    .tile-#{$value} {
+      $base-color: #fad2e1;
+      $target-color: #48002d;
+      $dark-color: #120009;
+      
+      background: if($i <= 11,
+                   mix($base-color, $target-color, percentage(1 - ($i/11))),
+                   darken($dark-color, $i - 11));
+      color: if($i > 1, #f9f6f2, #4a235a);
+      
+      @if $i >= 8 {
+        text-shadow: 0 0 5px rgba(0,0,0,0.5);
+      }
+    }
+  }
+}
+
+.design__blue {
+  @for $i from 1 through 17 {
+    $value: pow(2, $i);
+    .tile-#{$value} {
+      $base-color: #d0e4f1;
+      $target-color: #0f173b;
+      $dark-color: #040610;
+      
+      background: if($i <= 11,
+                   mix($base-color, $target-color, percentage(1 - ($i/11))),
+                   darken($dark-color, ($i - 11) * 5%));
+      color: if($i > 1, #f9f6f2, #003f88);
+      
+      @if $i >= 7 {
+        box-shadow: 0 0 10px 3px rgba(0,0,0,0.2);
+      }
+    }
   }
 }
 </style>
