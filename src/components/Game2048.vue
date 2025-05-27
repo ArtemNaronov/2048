@@ -77,7 +77,6 @@ const tileStyles = computed(() => {
 const startGame = (): void => {
   board.value = initBoard();
   score.value = 0;
-  saveGameState();
 };
 
 // Обработка движения плиток
@@ -174,6 +173,8 @@ const getTileStyle = (tile: Tile) => {
 
 const saveGameState = (): void => {
   localStorage.setItem("board", JSON.stringify(board.value));
+  console.log('bhbj');
+  
   localStorage.setItem("score", String(score.value));
 };
 
