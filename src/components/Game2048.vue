@@ -459,22 +459,34 @@ h1 {
     background-position: 0% 50%;
   }
 }
+$tile-colors: (
+  2: #eee4da,
+  4: #ede0c8,
+  8: #f2b179,
+  16: #f59563,
+  32: #f67c5f,
+  64: #f65e3b,
+  128: #edcf72,
+  256: #edcc61,
+  512: #edc850,
+  1024: #edc53f,
+  2048: #edc22e,
+  4096: #e8b017,   // насыщенный янтарный
+  8192: #e09c0f,   // тёмный оранжево-золотой
+  16384: #d98900,  // карамельно-оранжевый
+  32768: #d27500,  // жжёный апельсин
+  65536: #cb5f00,  // кирпично-оранжевый
+  131072: #c34900  // тёмный красно-оранжевый
+);
 
 // Classic tile colors
-@for $i from 1 through 17 {
-  $value: pow(2, $i);
+@each $value, $color in $tile-colors {
   .tile-#{$value} {
-    $base-color: #eee4da;
-    $target-color: #edc22e;
-    $dark-color: #3c3a32;
-    
-    background: if($i <= 11, 
-                 mix($base-color, $target-color, percentage(1 - ($i/11))),
-                 $dark-color);
-    color: if($i > 2, #f9f6f2, #776e65);
-    
-    @if $i >= 6 {
-      box-shadow: 0 0 15px 5px rgba(0,0,0,0.1);
+    background: $color;
+    color: if($value > 4, #f9f6f2, #776e65);
+
+    @if $value >= 64 {
+      box-shadow: 0 0 15px 5px rgba(0, 0, 0, 0.15);
     }
   }
 }
